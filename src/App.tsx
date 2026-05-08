@@ -1,5 +1,6 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { toPng } from 'html-to-image';
 import { 
   Building2, 
   Trees, 
@@ -12,7 +13,9 @@ import {
   Info,
   ChevronRight,
   Sparkles,
-  BarChart3
+  BarChart3,
+  Share2,
+  Download
 } from 'lucide-react';
 import { 
   Radar, 
@@ -59,6 +62,8 @@ export default function App() {
     [Dimension.ENVIRONMENT]: 0,
     [Dimension.RECOVERY]: 0,
   });
+  const resultRef = useRef<HTMLDivElement>(null);
+  const [isCapturing, setIsCapturing] = useState(false);
 
   // Calculate final scores and similarity
   const results = useMemo(() => {
@@ -80,7 +85,7 @@ export default function App() {
       });
       return { 
         ...city, 
-        matchScore: Math.round(Math.max(0, 100 - (Math.sqrt(distance) * 15))) 
+        matchScore: Math.round(Math.max(0, 100 - (Math.sqrt(distance) * 12))) 
       };
     }).sort((a, b) => b.matchScore - a.matchScore);
 
@@ -120,6 +125,54 @@ export default function App() {
       [Dimension.ENVIRONMENT]: 0,
       [Dimension.RECOVERY]: 0,
     });
+  };
+
+  const shareResult = async () => {
+    if (!results) return;
+    const text = `我的城市生活画像：最佳适配城市是【${results.primary.name}】(${results.primary.type})。\n"${results.primary.description}"\n生成你的画像：${window.location.href}`;
+    
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: '我的城市生活画像',
+          text: text,
+          url: window.location.href,
+        });
+      } else {
+        await navigator.clipboard.writeText(text);
+        alert('报告摘要已复制到剪贴板，快去分享给好友吧！');
+      }
+    } catch (err) {
+      console.error('Share failed:', err);
+    }
+  };
+
+  const saveAsImage = async () => {
+    if (!resultRef.current) return;
+    
+    setIsCapturing(true);
+    try {
+      // Small delay to ensure styles are applied
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      const dataUrl = await toPng(resultRef.current, {
+        cacheBust: true,
+        backgroundColor: '#fdfcf9',
+        style: {
+          borderRadius: '0' // Remove border radius for clean capture
+        }
+      });
+      
+      const link = document.createElement('a');
+      link.download = `CLAM-CityProfile-${results?.primary.name}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (err) {
+      console.error('Failed to save image:', err);
+      alert('保存图片失败，请尝试截图分享。');
+    } finally {
+      setIsCapturing(false);
+    }
   };
 
   return (
@@ -243,6 +296,7 @@ export default function App() {
         {screen === 'result' && results && (
           <motion.div 
             key="result"
+            ref={resultRef}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="max-w-4xl w-full bg-white rounded-[3rem] shadow-2xl border border-healing-sand overflow-hidden"
@@ -265,7 +319,7 @@ export default function App() {
                     <RadarChart cx="50%" cy="50%" outerRadius="80%" data={
                       Object.entries(DIMENSION_LABELS).map(([key, label]) => ({
                         subject: label,
-                        A: Math.min(100, Math.round((results.profile[key as Dimension] / 12) * 100)), // Normalize based on ~4 questions per dim * 3 avg score
+                        A: Math.min(100, Math.round((results.profile[key as Dimension] / 20) * 100)), // Max score per dim is 20
                         fullMark: 100,
                       }))
                     }>
@@ -342,13 +396,36 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="space-y-6 mt-12 pt-8 border-t border-healing-sand/50">
+                <div className="space-y-4 mt-12 pt-8 border-t border-healing-sand/50">
+                  <div className="grid grid-cols-2 gap-4">
+                    <button
+                      onClick={shareResult}
+                      disabled={isCapturing}
+                      className="py-5 rounded-2xl bg-healing-sand text-secondary font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-healing-bg transition-all active:scale-[0.98] border border-secondary/10"
+                    >
+                      <Share2 size={16} />
+                      分享文案
+                    </button>
+                    <button
+                      onClick={saveAsImage}
+                      disabled={isCapturing}
+                      className="py-5 rounded-2xl bg-primary text-white font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-secondary transition-all active:scale-[0.98] shadow-lg shadow-primary/10 disabled:opacity-50"
+                    >
+                      {isCapturing ? (
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        <Download size={16} />
+                      )}
+                      {isCapturing ? '生成中...' : '保存图片'}
+                    </button>
+                  </div>
                   <button
                     onClick={reset}
+                    disabled={isCapturing}
                     className="w-full py-5 rounded-2xl bg-healing-bg text-secondary font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-healing-sand transition-all border border-healing-sand active:scale-[0.98]"
                   >
                     <RotateCcw size={16} />
-                    重新生成
+                    重新开始
                   </button>
                   <div className="flex flex-col items-center gap-2 opacity-30">
                     <p className="text-[8px] text-primary font-bold text-center uppercase tracking-[0.2em] max-w-xs leading-normal">
