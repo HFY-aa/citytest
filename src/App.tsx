@@ -87,9 +87,14 @@ export default function App() {
       // The lower the distance, the higher the match score. 
       // We increased the spread slightly but added a minimum match floor for balance.
       const rawMatch = 100 - (Math.sqrt(distance) * 12);
+      
+      // Add organic fluctuation (+-2%) to make results feel less rigid
+      const jitter = (Math.random() * 4) - 2;
+      const finalScore = Math.min(99, Math.max(40, Math.round(rawMatch + jitter)));
+      
       return { 
         ...city, 
-        matchScore: Math.max(40, Math.round(rawMatch)) 
+        matchScore: finalScore
       };
     }).sort((a, b) => b.matchScore - a.matchScore);
 
