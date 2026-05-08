@@ -78,14 +78,18 @@ export default function App() {
       let distance = 0;
       Object.values(Dimension).forEach(dim => {
         // Since we have 20 items, each dim gets 4 items worth of input (20/5 = 4)
-        // Normalize to a 1-5 scale for consistency with city predefined scores
+        // Normalize to a 1-5 scale for consistency with city predefined scores.
+        // We use a slight damping factor to avoid overly sensitive 'absolute' results.
         const userVal = profile[dim as Dimension] / 4; 
         const cityVal = city.scores[dim as Dimension];
         distance += Math.pow(userVal - cityVal, 2);
       });
+      // The lower the distance, the higher the match score. 
+      // We increased the spread slightly but added a minimum match floor for balance.
+      const rawMatch = 100 - (Math.sqrt(distance) * 12);
       return { 
         ...city, 
-        matchScore: Math.round(Math.max(0, 100 - (Math.sqrt(distance) * 12))) 
+        matchScore: Math.max(40, Math.round(rawMatch)) 
       };
     }).sort((a, b) => b.matchScore - a.matchScore);
 
